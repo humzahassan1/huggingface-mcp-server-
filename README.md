@@ -57,6 +57,6 @@ Once connected to an MCP client (like Dedalus), an agent can:
 ## Tech Stack
 
 - **Python** — core language
-- **FastMCP** — MCP server framework
+- **Dedalus MCP** — MCP server framework
 - **httpx** — async HTTP client
 - **HuggingFace API** — model and dataset metadata
