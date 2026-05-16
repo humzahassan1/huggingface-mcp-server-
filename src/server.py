@@ -15,7 +15,7 @@ mcp = FastMCP("huggingface-mcp-server")
 @mcp.tool()
 async def search_models(query: str, limit: int = 5) -> str:
     """Search HuggingFace Hub for machine learning models by keyword."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(
             "https://huggingface.co/api/models",
             params={"search": query, "limit": limit, "sort": "downloads"},
@@ -41,13 +41,12 @@ async def search_models(query: str, limit: int = 5) -> str:
         
         return f"Found {len(models)} models for '{query}':\n\n" + "\n\n".join(results)
 
-if __name__ == "__main__":
-    mcp.run(transport="stdio")
+
     
 @mcp.tool()
 async def get_model_info(model_id: str) -> str:
     """Get detailed information about a specific HuggingFace model."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(
             f"https://huggingface.co/api/models/{model_id}",
             headers={"Authorization": f"Bearer {HF_TOKEN}"},
@@ -75,7 +74,7 @@ async def get_model_info(model_id: str) -> str:
 @mcp.tool()
 async def search_datasets(query: str, limit: int = 5) -> str:
     """Search HuggingFace Hub for datasets by keyword."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(
             "https://huggingface.co/api/datasets",
             params={"search": query, "limit": limit, "sort": "downloads"},
@@ -104,7 +103,7 @@ async def search_datasets(query: str, limit: int = 5) -> str:
 @mcp.tool()
 async def get_dataset_info(dataset_id: str) -> str:
     """Get detailed information about a specific HuggingFace dataset."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(
             f"https://huggingface.co/api/datasets/{dataset_id}",
             headers={"Authorization": f"Bearer {HF_TOKEN}"},
@@ -126,32 +125,5 @@ async def get_dataset_info(dataset_id: str) -> str:
             f"URL: https://huggingface.co/datasets/{ds.get('id', '')}"
         )
 
-
-@mcp.tool()
-async def run_inference(model_id: str, input_text: str) -> str:
-    """Run inference on a HuggingFace model using the free Inference API."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            f"https://api-inference.huggingface.co/models/{model_id}",
-            headers={"Authorization": f"Bearer {HF_TOKEN}"},
-            json={"inputs": input_text},
-        )
-
-        if response.status_code == 503:
-            return f"Model '{model_id}' is loading. Try again in a few seconds."
-        if response.status_code != 200:
-            return f"Error: {response.status_code} - {response.text}"
-
-        result = response.json()
-
-        if isinstance(result, list) and len(result) > 0:
-            if isinstance(result[0], dict):
-                return "\n".join(
-                    f"- {item.get('label', 'N/A')}: {item.get('score', 'N/A'):.4f}"
-                    if 'label' in item
-                    else f"- {item.get('generated_text', str(item))}"
-                    for item in result
-                )
-            return str(result)
-
-        return str(result)
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
