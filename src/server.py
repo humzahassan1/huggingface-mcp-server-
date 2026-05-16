@@ -1,7 +1,8 @@
 import os
+import asyncio
 import httpx
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from dedalus_mcp import MCPServer, tool
 
 # Load environment variables
 load_dotenv()
@@ -9,27 +10,24 @@ load_dotenv()
 # Get HuggingFace token
 HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
-# Create the MCP server
-mcp = FastMCP("huggingface-mcp-server")
 
-@mcp.tool()
+@tool(description="Search HuggingFace Hub for machine learning models by keyword")
 async def search_models(query: str, limit: int = 5) -> str:
-    """Search HuggingFace Hub for machine learning models by keyword."""
     async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(
             "https://huggingface.co/api/models",
             params={"search": query, "limit": limit, "sort": "downloads"},
             headers={"Authorization": f"Bearer {HF_TOKEN}"},
         )
-        
+
         if response.status_code != 200:
             return f"Error: {response.status_code} - {response.text}"
-        
+
         models = response.json()
-        
+
         if not models:
             return f"No models found for '{query}'"
-        
+
         results = []
         for model in models:
             results.append(
@@ -38,14 +36,12 @@ async def search_models(query: str, limit: int = 5) -> str:
                 f"  Tags: {', '.join(model.get('tags', [])[:5])}\n"
                 f"  Pipeline: {model.get('pipeline_tag', 'N/A')}"
             )
-        
+
         return f"Found {len(models)} models for '{query}':\n\n" + "\n\n".join(results)
 
 
-    
-@mcp.tool()
+@tool(description="Get detailed information about a specific HuggingFace model")
 async def get_model_info(model_id: str) -> str:
-    """Get detailed information about a specific HuggingFace model."""
     async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(
             f"https://huggingface.co/api/models/{model_id}",
@@ -71,9 +67,8 @@ async def get_model_info(model_id: str) -> str:
         )
 
 
-@mcp.tool()
+@tool(description="Search HuggingFace Hub for datasets by keyword")
 async def search_datasets(query: str, limit: int = 5) -> str:
-    """Search HuggingFace Hub for datasets by keyword."""
     async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(
             "https://huggingface.co/api/datasets",
@@ -100,9 +95,8 @@ async def search_datasets(query: str, limit: int = 5) -> str:
         return f"Found {len(datasets)} datasets for '{query}':\n\n" + "\n\n".join(results)
 
 
-@mcp.tool()
+@tool(description="Get detailed information about a specific HuggingFace dataset")
 async def get_dataset_info(dataset_id: str) -> str:
-    """Get detailed information about a specific HuggingFace dataset."""
     async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(
             f"https://huggingface.co/api/datasets/{dataset_id}",
@@ -125,5 +119,13 @@ async def get_dataset_info(dataset_id: str) -> str:
             f"URL: https://huggingface.co/datasets/{ds.get('id', '')}"
         )
 
+
+# Create server and register tools
+server = MCPServer("huggingface-mcp-server")
+server.collect(search_models)
+server.collect(get_model_info)
+server.collect(search_datasets)
+server.collect(get_dataset_info)
+
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    asyncio.run(server.serve())
